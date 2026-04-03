@@ -45,5 +45,5 @@ host:
 
 run-local:
 	@echo "Running crash triage..."
-	@sudo java -jar crashme/host/target/crashme-crashme.jar ch.usi.inf.crashme.CrashMe
+	@sudo java -jar crashme/host/target/crashme-crashme.jar ch.usi.inf.confidentialstorm.CrashMe
 	@echo "Finished local run."

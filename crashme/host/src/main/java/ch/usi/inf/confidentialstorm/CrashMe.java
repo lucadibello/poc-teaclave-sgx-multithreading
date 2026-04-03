@@ -1,6 +1,6 @@
-package ch.usi.inf.crashme;
+package ch.usi.inf.confidentialstorm;
 
-import ch.usi.inf.crashme.common.api.SimpleService;
+import ch.usi.inf.confidentialstorm.common.api.SimpleService;
 import org.apache.teaclave.javasdk.host.Enclave;
 import org.apache.teaclave.javasdk.host.EnclaveFactory;
 import org.apache.teaclave.javasdk.host.EnclaveType;
@@ -12,7 +12,6 @@ import java.util.Iterator;
 
 public class CrashMe {
     private static Enclave currentEnclave;
-    private static final int ROUNDS = 5;
 
     public static SimpleService loadTestService() {
         // Create enclave for SimpleService
@@ -46,134 +45,37 @@ public class CrashMe {
     /**
      * Test 1 - Create and use an enclave in the same thread. Destroy in main thread
      */
-    public static void test1() throws EnclaveDestroyingException {
-        // Load the test service
+    public static void test1() throws EnclaveDestroyingException  {
         SimpleService simpleService = loadTestService();
 
-        // Make a couple of calls from this thread
-        System.out.println("Making calls to SimpleService in thread: " + Thread.currentThread().getId());
-        for (int i = 0; i < 5; i++) {
-            String message = "Hello " + i;
-            String response = simpleService.echo(message);
-            System.out.println("Response from enclave in thread " + Thread.currentThread().getName() + ": " + response);
+        // start a background thread inside the enclave
+        boolean state = simpleService.startAsyncThread();
+        if (!state) {
+            throw new RuntimeException("Failed to start async thread in enclave");
         }
-        System.out.println("Done");
 
-        // Destroy the enclave
-        CrashMe.currentEnclave.destroy();
-    }
-
-    /**
-     * Test 2 - Using an enclave started in one thread from another thread. Destroy in main thread
-     */
-    public static void test2() throws EnclaveDestroyingException, InterruptedException {
-        // Load enclave in main thread
-        SimpleService simpleService = loadTestService();
-
-        // This thread is not able to use the service!
-        Thread thread = new Thread(() -> {
-            for (int i = 0; i < CrashMe.ROUNDS; i++) {
-                try {
-                    String message = "Hello from thread " + i;
-                    String response = simpleService.echo(message);
-                    System.out.println("Response from enclave in thread " + Thread.currentThread().getId() + ": " + response);
-                } catch (Exception e ) {
-                   System.out.println("Exception in thread " + Thread.currentThread().getId() + ": " + e.getMessage() + " " + e);
-                }
-            }
-        });
-
-        // Start the thread
-        thread.start();
-        thread.join();
-
-        // Destroy the enclave in the main thread after starting the new thread
-        CrashMe.currentEnclave.destroy();
-    }
-
-    /**
-     * Test 3 - Create enclave in one thread, use in another thread. Destroy in same thread as use.
-     */
-    public static void test3() throws InterruptedException {
-
-        Thread thread = new Thread(() -> {
-            // Load the test service
-            SimpleService simpleService = loadTestService();
-
-            // Make a couple of calls from this thread
-            System.out.println("Making calls to SimpleService in thread: " + Thread.currentThread().getId());
-            for (int i = 0; i < CrashMe.ROUNDS; i++) {
-                String message = "Hello from thread " + i;
-                String response = simpleService.echo(message);
-                System.out.println("Response from enclave in thread " + Thread.currentThread().getId() + ": " + response);
-            }
-            System.out.println("Done");
-
-            // Destroy the enclave
+        // Wait for the async thread to finish
+        while (simpleService.isAsyncThreadRunning()) {
             try {
-                CrashMe.currentEnclave.destroy();
-            } catch (EnclaveDestroyingException e) {
-                System.out.println("Exception while destroying enclave in thread " + Thread.currentThread().getId() + ": " + e.getMessage());
-                throw new RuntimeException(e);
+                // make call when the thread is still running to see if it works
+                int result = simpleService.someWork();
+                System.out.println("Result of someWork while async thread is running: " + result);
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        });
+        }
 
-        thread.start();
-        thread.join();
-    }
+        // Ensure that the async thread has finished before destroying the enclave
+        boolean isRunning = simpleService.isAsyncThreadRunning();
+        System.out.println("Is async thread still running before destroy? " + isRunning);
 
-
-    /**
-     * Create enclave in one thread, use it in the same thread, but destroy it in main thread.
-     */
-    public static void test4() throws EnclaveDestroyingException, InterruptedException {
-        Thread thread = new Thread(() -> {
-            // Load the test service
-            SimpleService simpleService = loadTestService();
-
-            // Make a couple of calls from this thread
-            System.out.println("Making calls to SimpleService in thread: " + Thread.currentThread().getId());
-            for (int i = 0; i < CrashMe.ROUNDS; i++) {
-                String message = "Hello from thread " + i;
-                String response = simpleService.echo(message);
-                System.out.println("Response from enclave in thread " + Thread.currentThread().getId() + ": " + response);
-            }
-            System.out.println("Done");
-        });
-
-        thread.start();
-        thread.join();
-
-        // Use static reference to destroy the enclave in main thread
+        // Load the test service
         CrashMe.currentEnclave.destroy();
     }
 
     public static void main(String[] args) throws EnclaveDestroyingException, InterruptedException {
         System.out.println();
-        System.out.println("Running test 1: Create and use enclave in same thread, destroy in main thread");
         test1();
-
-        System.out.println();
-        System.out.println("------------------------------------------------------------------------------");
-        System.out.println();
-
-        System.out.println("\nRunning test 2: Create enclave in main thread, use in another thread, destroy in main thread");
-        test2();
-
-        System.out.println();
-        System.out.println("------------------------------------------------------------------------------");
-        System.out.println();
-
-        System.out.println("\nRunning test 3: Create enclave in one thread, use and destroy in same thread");
-        test3();
-
-        System.out.println();
-        System.out.println("------------------------------------------------------------------------------");
-        System.out.println();
-
-        // NOTE: until this point, everything should work.
-
-        System.out.println("\nRunning test 4: Create and use enclave in one thread, destroy in main thread");
-        test4(); // When calling destroy from the thread, it crashes!
     }
 }

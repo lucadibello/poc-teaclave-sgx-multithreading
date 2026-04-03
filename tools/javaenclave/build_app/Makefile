@@ -15,11 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-include /workspaces/teaclave-crash-investigation/tools/javaenclave/config/config.mk
-include /workspaces/teaclave-crash-investigation/tools/javaenclave/config/platform/tee_sdk_svm/jni/config.mk
+include $(BUILD_SCRIPT_DIR)/../config/config.mk
+include $(BUILD_SCRIPT_DIR)/../config/platform/tee_sdk_svm/jni/config.mk
 
 # additional settings for stubs
-XATTR_STUB_SRC := ${ENCLAVE_BASE_DIR}/src/main/stubs/xattr_stubs.c
+XATTR_STUB_SRC := $(BUILD_SCRIPT_DIR)/../../../crashme/enclave/src/main/stubs/xattr_stubs.c
 XATTR_STUB_OBJ := ${ENCLAVE_BASE_DIR}/target/enclave_workspace/xattr_stubs.o
 
 .PHONY: all build clean
