@@ -5,7 +5,7 @@ dotenv: [".env"]
 vars:
   WORKSPACE: .
   SESSION: dev
-  CONTAINER_NAME: crash-investigation
+  CONTAINER_NAME: poc-teaclave-devcontainer
   TUNNEL_SRV: sws01
   TUNNEL_USER: luca
   SSH_TUNNEL_REMOTE_PORT: 2222
