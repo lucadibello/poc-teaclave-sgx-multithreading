@@ -11,20 +11,30 @@ public class SimpleEnclaveImpl implements SimpleService {
     @Override
     public boolean startAsyncThread() {
         asyncThread = new Thread(() -> {
-            System.out.println("Async thread started in enclave, thread ID: " + Thread.currentThread
-                    ().getId());
-            try {
-                Thread.sleep(3000); // Simulate some work
-                fib(30); // Simulate CPU-intensive work
-                System.out.println("Async thread finished work in enclave, thread ID: " + Thread.currentThread().getId());
-            } catch (InterruptedException e) {
-                System.out.println("Async thread interrupted in enclave, thread ID: " + Thread.currentThread
-                        ().threadId());
-                return;
-            }});
-        asyncThread.setDaemon(true); // Ensure the thread does not prevent enclave shutdown
+            System.out.println("Async thread started in enclave, thread ID: " + Thread.currentThread().getId());
+            // Busy-wait to simulate a long-running job without relying on Thread.sleep(),
+            // which may not work correctly inside the enclave JVM.
+            long end = System.currentTimeMillis() + 10_000;
+            while (System.currentTimeMillis() < end) {
+                // spin
+            }
+            System.out.println("Async thread finished work in enclave, thread ID: " + Thread.currentThread().getId());
+        });
+        asyncThread.setDaemon(true); // Don't block enclave shutdown if the job is still running
         asyncThread.start();
         return true;
+    }
+
+    @Override
+    public void stopAsyncThread() {
+        if (asyncThread != null && asyncThread.isAlive()) {
+            asyncThread.interrupt();
+            try {
+                asyncThread.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     @Override
