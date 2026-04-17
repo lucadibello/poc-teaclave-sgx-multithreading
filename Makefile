@@ -9,7 +9,7 @@ MAVEN_FLAGS ?= -DskipTests
 # Toggle native profile (requires SGX-enabled env) via `make ENCLAVE_PROFILE= enclave`.
 ENCLAVE_PROFILE ?= -Pnative
 
-.PHONY: all build help clean common enclave host submit run-local
+.PHONY: all build help clean common enclave host submit run-local test
 
 all: build
 
@@ -18,7 +18,8 @@ help:
 	@echo "  make [all|build]   - Build common, enclave (native), and host artifacts"
 	@echo "  make common        - Build the shared Java library"
 	@echo "  make enclave       - Build enclave artifacts (default profile: $(ENCLAVE_PROFILE))"
-	@echo "  make host          - Build the Storm topology (depends on enclave output)"
+	@echo "  make host          - Build the test package (depends on enclave output)"
+	@echo "  make test          - Run JUnit test suite (requires sudo for subprocesses)"
 	@echo "  make clean         - Run 'mvn clean' for the whole aggregate project"
 	@echo ""
 	@echo "Variables:"
@@ -45,5 +46,14 @@ host:
 
 run-local:
 	@echo "Running crash triage..."
-	@sudo java -jar crashme/host/target/crashme-crashme.jar ch.usi.inf.confidentialstorm.CrashMe
+	@sudo java -jar crashme/host/target/crashme-crashme.jar
 	@echo "Finished local run."
+
+# Run JUnit test suite via shaded jar + test-scoped classpath (includes console-standalone).
+test:
+	@TEST_CP=$$($(MVN) -f crashme/host/pom.xml -q dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=/dev/stdout 2>/dev/null); \
+	sudo java -cp "crashme/host/target/crashme-crashme.jar:crashme/host/target/test-classes:$$TEST_CP" \
+		org.junit.platform.console.ConsoleLauncher execute \
+		--select-class=ch.usi.inf.confidentialstorm.CrashMe \
+		--disable-banner  \
+		--details=testfeed

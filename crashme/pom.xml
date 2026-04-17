@@ -13,13 +13,21 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <junit.jupiter.version>5.10.2</junit.jupiter.version>
-        <junit.platform.version>1.10.2</junit.platform.version>
         <org.apache.teaclave.javasdk.platform>MOCK_IN_SVM:TEE_SDK:EMBEDDED_LIB_OS</org.apache.teaclave.javasdk.platform>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- JUnit dependencies -->
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>6.0.3</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- teaclave dependencies -->
             <dependency>
                 <groupId>org.apache.teaclave.javasdk</groupId>
                 <artifactId>common</artifactId>
@@ -36,6 +44,7 @@
                 <version>0.1.0</version>
             </dependency>
 
+            <!-- confidentialstorm dependencies -->
             <dependency>
                 <groupId>ch.usi.inf.confidentialstorm</groupId>
                 <artifactId>common</artifactId>
@@ -50,40 +59,11 @@
                 <groupId>ch.usi.inf.confidentialstorm</groupId>
                 <artifactId>host</artifactId>
                 <version>1.0-SNAPSHOT</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-api</artifactId>
-                <version>5.7.1</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.platform</groupId>
-                <artifactId>junit-platform-engine</artifactId>
-                <version>1.8.2</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.platform</groupId>
-                <artifactId>junit-platform-launcher</artifactId>
-                <version>1.8.2</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.6.2</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit-pioneer</groupId>
-                <artifactId>junit-pioneer</artifactId>
-                <version>1.5.0</version>
-                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <!-- Modules -->
     <modules>
         <module>common</module>
         <module>enclave</module>
