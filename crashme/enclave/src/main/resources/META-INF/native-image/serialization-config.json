@@ -1,4 +1,8 @@
 [
+  { "name": "java.lang.String" },
+  { "name": "java.lang.Long" },
+  { "name": "java.lang.Number" },
+
   { "name": "java.util.ArrayList" },
   { "name": "java.util.LinkedList" },
   { "name": "java.util.HashMap" },
