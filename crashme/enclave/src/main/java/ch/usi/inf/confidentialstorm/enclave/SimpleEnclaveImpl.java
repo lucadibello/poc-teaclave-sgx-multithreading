@@ -32,18 +32,20 @@ public class SimpleEnclaveImpl implements SimpleService {
     @Override
     public boolean startAsyncThread() {
         if (asyncThread != null && asyncThread.isAlive()) {
-            System.out.println("Async thread already running, rejecting start request");
+            System.err.println("[enclave] Async thread already running, rejecting start request");
             return false;
         }
         asyncThread = new Thread(() -> {
-            System.out.println("Async thread started in enclave, thread ID: " + Thread.currentThread().getId());
+            System.err.println("[enclave] Async thread started, thread ID: " + Thread.currentThread().getId());
+            System.err.flush();
             // Busy-wait to simulate a long-running job without relying on Thread.sleep(),
             // which may not work correctly inside the enclave JVM.
             long end = System.currentTimeMillis() + 3_000;
             while (System.currentTimeMillis() < end) {
                 // spin
             }
-            System.out.println("Async thread finished work in enclave, thread ID: " + Thread.currentThread().getId());
+            System.err.println("[enclave] Async thread finished, thread ID: " + Thread.currentThread().getId());
+            System.err.flush();
         });
         asyncThread.setDaemon(true); // Don't block enclave shutdown if the job is still running
         asyncThread.start();
@@ -67,8 +69,7 @@ public class SimpleEnclaveImpl implements SimpleService {
 
     @Override
     public int someWork() {
-        System.out.println("Doing some work in enclave, thread ID: " + Thread.currentThread
-                ().getId());
+        System.out.println("[enclave] Doing some work, thread ID: " + Thread.currentThread().getId());
         // fib(30) is a CPU-intensive task that will take some time to complete
         return fib(30);
     }
@@ -84,7 +85,7 @@ public class SimpleEnclaveImpl implements SimpleService {
             return false;
         }
         asyncThread = new Thread(() -> {
-            System.out.println("[enclave-bg] Heap-allocating thread started, id=" + Thread.currentThread().getId());
+            System.out.println("[enclave] Heap-allocating thread started, id=" + Thread.currentThread().getId());
             // Continuously allocate and discard large object graphs to trigger GC safepoints
             // inside the isolate as frequently as possible. Larger forests = more allocation
             // per iteration = more frequent GC = higher probability of a safepoint coinciding
@@ -109,7 +110,7 @@ public class SimpleEnclaveImpl implements SimpleService {
                 }
                 iterations++;
             }
-            System.out.println("[enclave-bg] Heap-allocating thread finished after " + iterations + " iterations");
+            System.out.println("[enclave] Heap-allocating thread finished after " + iterations + " iterations");
         });
         asyncThread.setDaemon(true);
         asyncThread.start();
@@ -812,12 +813,10 @@ public class SimpleEnclaveImpl implements SimpleService {
         return true;
     }
 
-    // ---- Test 5: Enclave-side Thread.start() with synchronous pthread_create shim ----
+    // ---- Test 5: Enclave-side Thread.start() with real sgx_pthread threads ----
 
     @Override
     public int runInlineThread(int fibN) {
-        // Holds the result written by the enclave-side thread.
-        // Must be a single-element array so the lambda can write to it.
         int[] result = {-1};
         Thread t = new Thread(() -> {
             System.out.println("[enclave-inline] thread started on TCS id="
@@ -825,39 +824,60 @@ public class SimpleEnclaveImpl implements SimpleService {
             result[0] = fib(fibN);
             System.out.println("[enclave-inline] thread finished, fib(" + fibN + ")=" + result[0]);
         }, "enclave-inline-fib");
-        // Under the synchronous pthread_create shim this blocks until the lambda returns.
         t.start();
-        System.out.println("[enclave-inline] Thread.start() returned, result=" + result[0]);
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("[enclave-inline] Thread.join() returned, result=" + result[0]);
         return result[0];
     }
 
     @Override
     public boolean isInlineThreadSynchronous() {
+        // Real sgx_pthread threads run concurrently on a different TCS.
+        // Probe for async behaviour: spin briefly waiting for the worker to
+        // flip the flag. Return true if Thread.start() behaves synchronously
+        // (flag observed before any wait), which would indicate a regression
+        // to the old shim.
         boolean[] flag = {false};
         Thread t = new Thread(() -> {
             flag[0] = true;
             System.out.println("[enclave-inline] synchrony flag set");
         }, "enclave-inline-flag");
         t.start();
-        // If pthread_create is truly synchronous, flag[0] must be true here.
-        boolean observed = flag[0];
-        System.out.println("[enclave-inline] flag after Thread.start() = " + observed);
-        return observed;
+        boolean observedSync = flag[0];
+        try {
+            t.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("[enclave-inline] flag pre-join=" + observedSync
+                + " post-join=" + flag[0]);
+        return observedSync;
     }
 
     @Override
     public long runNInlineThreads(int n, int fibN) {
-        long total = 0;
+        Thread[] threads = new Thread[n];
+        long[] partials = new long[n];
         for (int i = 0; i < n; i++) {
             final int idx = i;
-            long[] partial = {0};
-            Thread t = new Thread(() -> {
-                partial[0] = fib(fibN);
-                System.out.println("[enclave-inline] thread " + idx + " done, fib=" + partial[0]);
+            threads[i] = new Thread(() -> {
+                partials[idx] = fib(fibN);
+                System.out.println("[enclave-inline] thread " + idx + " done, fib=" + partials[idx]);
             }, "enclave-inline-" + i);
-            t.start();
-            // Synchronous: partial[0] is set before t.start() returns.
-            total += partial[0];
+            threads[i].start();
+        }
+        long total = 0;
+        for (int i = 0; i < n; i++) {
+            try {
+                threads[i].join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            total += partials[i];
         }
         System.out.println("[enclave-inline] " + n + " threads completed, total=" + total);
         return total;
