@@ -15,12 +15,15 @@ all: build
 
 help:
 	@echo "Make targets:"
-	@echo "  make [all|build]   - Build common, enclave (native), and host artifacts"
-	@echo "  make common        - Build the shared Java library"
-	@echo "  make enclave       - Build enclave artifacts (default profile: $(ENCLAVE_PROFILE))"
-	@echo "  make host          - Build the test package (depends on enclave output)"
-	@echo "  make test          - Run JUnit test suite (requires sudo for subprocesses)"
-	@echo "  make clean         - Run 'mvn clean' for the whole aggregate project"
+	@echo "  make [all|build]   - Orchestrates the full build process: common library, native enclave, and host application."
+	@echo "  make common        - Compiles the shared Java API and data models used by both host and enclave."
+	@echo "  make enclave       - Builds the native SGX enclave using GraalVM Native Image and signs the resulting binary."
+	@echo "  make host          - Compiles the host-side application, bundling the signed enclave binary into resources."
+	@echo "  make test          - Runs the JUnit test suite via Maven Surefire (redirects output, use for CI/automated checks)."
+	@echo "  make test-console  - Runs JUnit tests via ConsoleLauncher to bypass Surefire and see raw enclave/native logs."
+	@echo "  make test-method   - Runs a specific test method. Usage: make test-method METHOD=methodName"
+	@echo "  make run-local     - Executes the host application (requires sudo) for manual triage of enclave crashes."
+	@echo "  make clean         - Removes all build artifacts, target directories, and temporary native-image files."
 	@echo ""
 	@echo "Variables:"
 	@echo "  MVN=<path>                Override Maven binary (default: mvn)"
@@ -49,11 +52,24 @@ run-local:
 	@sudo java -jar crashme/host/target/crashme-crashme.jar
 	@echo "Finished local run."
 
-# Run JUnit test suite via shaded jar + test-scoped classpath (includes console-standalone).
 test:
+	sudo $(MVN) -f $(ROOT_POM) test -pl host -am
+
+test-debug:
 	@TEST_CP=$$($(MVN) -f crashme/host/pom.xml -q dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=/dev/stdout 2>/dev/null); \
 	sudo java -cp "crashme/host/target/crashme-crashme.jar:crashme/host/target/test-classes:$$TEST_CP" \
 		org.junit.platform.console.ConsoleLauncher execute \
 		--select-class=ch.usi.inf.confidentialstorm.CrashMe \
+		--disable-banner  \
+		--details=testfeed
+
+test-method:
+	sudo $(MVN) -f $(ROOT_POM) test -pl host -am -Dtest=ch.usi.inf.confidentialstorm.CrashMe#$(METHOD)
+
+test-method-debug:
+	@TEST_CP=$$($(MVN) -f crashme/host/pom.xml -q dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=/dev/stdout 2>/dev/null); \
+	sudo java -cp "crashme/host/target/crashme-crashme.jar:crashme/host/target/test-classes:$$TEST_CP" \
+		org.junit.platform.console.ConsoleLauncher execute \
+		--select-method=ch.usi.inf.confidentialstorm.CrashMe#$(METHOD) \
 		--disable-banner  \
 		--details=testfeed
