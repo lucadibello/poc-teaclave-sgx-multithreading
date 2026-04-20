@@ -17,6 +17,7 @@ make build test-debug    # Build + run tests with full native logs
 ```
 
 ### Key Improvements
+
 1. **Multi-threading Support:** Enables concurrent ingestion and processing within the same enclave.
 2. **TCS Cache Mode:** Implements a per-TCS `IsolateThread` cache to prevent "zombie" threads and illegal registrations in GraalVM.
 3. **Synchronous Pthread Shim:** Ensures enclave-side `Thread.start()` executes safely within the calling thread's context.
