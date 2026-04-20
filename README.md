@@ -1,10 +1,20 @@
 # Proof of Concept — Concurrent ECALLs on SGX using Modified Apache Teaclave
 
+>[!NOTE]
+>This is a testbed repository that validates the modified SDK's concurrency capabilities. The test suite is now maintained in the [modified SDK repository](https://github.com/lucadibello/teaclave-java-tee-sdk/blob/master/test/host/src/main/java/org/apache/teaclave/javasdk/test/host/TestEnclaveConcurrency.java).
+
 ## Goal
 
 This PoC validates that a **modified version of the Apache Teaclave Java SDK** supports **concurrent ECALLs from multiple host threads** into a single SGX enclave. This was previously impossible due to illegal thread registration and TCS management issues in the upstream SDK.
 
 The modified SDK is available at: [lucadibello/teaclave-java-tee-sdk](https://github.com/lucadibello/teaclave-java-tee-sdk)
+
+## Quick Start
+
+```bash
+make build test          # Build + run tests (Standard CI output)
+make build test-debug    # Build + run tests with full native logs
+```
 
 ### Key Improvements
 1. **Multi-threading Support:** Enables concurrent ingestion and processing within the same enclave.
@@ -13,7 +23,7 @@ The modified SDK is available at: [lucadibello/teaclave-java-tee-sdk](https://gi
 
 ## What is tested
 
-The test suite (`CrashMe.java`) uses **JUnit 5** to stress various concurrency patterns:
+The test suite (`CrashMe.java`) uses **JUnit 6** to stress various concurrency patterns:
 
 | Test Group | Description |
 |------------|-------------|
